@@ -1,126 +1,113 @@
+﻿using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using FairShare.Web.Data;
-using FairShare.Web.Models;
+using FairShare.Web.Data;      // DbContext namespace
+using FairShare.Web.Models;    // Expense, Group, User, ExpenseShare, GroupMember
 
 namespace FairShare.Web.Controllers
 {
     public class ExpensesController : Controller
     {
         private readonly ApplicationDbContext _ctx;
-        public ExpensesController(ApplicationDbContext ctx) { _ctx = ctx; }
+        public ExpensesController(ApplicationDbContext ctx) => _ctx = ctx;
 
+        // GET: /Expenses
         public async Task<IActionResult> Index()
         {
-            var q = _ctx.Expenses
+            var list = await _ctx.Expenses
                 .Include(e => e.Group)
                 .Include(e => e.PaidByUser)
-                .OrderByDescending(e => e.SpentOnUtc);
-            return View(await q.ToListAsync());
-        }
-
-        public async Task<IActionResult> Create()
-        {
-            await PopulateLookups();
-            return View(new Expense { SpentOnUtc = DateTime.UtcNow.Date });
-        }
-
-        [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Expense expense)
-        {
-            if (!ModelState.IsValid)
-            {
-                await PopulateLookups();
-                return View(expense);
-            }
-
-            _ctx.Expenses.Add(expense);
-            await _ctx.SaveChangesAsync();
-
-            var memberIds = await _ctx.GroupMembers
-                .Where(m => m.GroupId == expense.GroupId)
-                .Select(m => m.UserId)
+                .AsNoTracking()
+                .OrderByDescending(e => e.SpentOnUtc)
                 .ToListAsync();
 
-            if (memberIds.Count > 0)
-            {
-                var each = Math.Round(expense.Amount / memberIds.Count, 2);
-                foreach (var uid in memberIds)
-                {
-                    _ctx.ExpenseShares.Add(new ExpenseShare
-                    {
-                        ExpenseId = expense.Id,
-                        UserId = uid,
-                        ShareAmount = each,
-                        IsSettled = uid == expense.PaidByUserId
-                    });
-                }
-                await _ctx.SaveChangesAsync();
-            }
-
-            return RedirectToAction(nameof(Index));
+            return View(list);
         }
 
-        public async Task<IActionResult> Edit(int id)
+        // GET: /Expenses/Create
+        public async Task<IActionResult> Create()
         {
-            var expense = await _ctx.Expenses.FindAsync(id);
-            if (expense == null) return NotFound();
-            await PopulateLookups();
-            return View(expense);
+            await LoadDropdowns();
+            return View(new Expense { SpentOnUtc = System.DateTime.UtcNow });
         }
 
-        [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Expense expense)
+        // POST: /Expenses/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create([Bind("Description,Amount,GroupId,PaidByUserId,SpentOnUtc")] Expense e)
         {
-            if (id != expense.Id) return BadRequest();
+            // 🔎 prove the action is hit (comment out when done)
+            ViewData["DebugHit"] = "POST /Expenses/Create was hit";
+
+            // Basic validation
+            if (string.IsNullOrWhiteSpace(e.Description))
+                ModelState.AddModelError(nameof(e.Description), "Description is required.");
+            if (e.Amount <= 0)
+                ModelState.AddModelError(nameof(e.Amount), "Enter a positive amount.");
+
+            // normalize date to UTC
+            if (e.SpentOnUtc.Kind == System.DateTimeKind.Unspecified)
+                e.SpentOnUtc = System.DateTime.SpecifyKind(e.SpentOnUtc, System.DateTimeKind.Utc);
+
             if (!ModelState.IsValid)
             {
-                await PopulateLookups();
-                return View(expense);
+                await LoadDropdowns();
+                return View(e);
             }
-            _ctx.Update(expense);
-            await _ctx.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-        }
 
-        public async Task<IActionResult> Details(int id)
-        {
-            var expense = await _ctx.Expenses
-                .Include(e => e.Group)
-                .Include(e => e.PaidByUser)
-                .Include(e => e.Shares).ThenInclude(s => s.User)
-                .FirstOrDefaultAsync(e => e.Id == id);
-            if (expense == null) return NotFound();
-            return View(expense);
-        }
-
-        public async Task<IActionResult> Delete(int id)
-        {
-            var expense = await _ctx.Expenses
-                .Include(e => e.Group)
-                .Include(e => e.PaidByUser)
-                .FirstOrDefaultAsync(e => e.Id == id);
-            if (expense == null) return NotFound();
-            return View(expense);
-        }
-
-        [HttpPost, ActionName("Delete"), ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var expense = await _ctx.Expenses.FindAsync(id);
-            if (expense != null)
+            try
             {
-                _ctx.Expenses.Remove(expense);
+                // fields many schemas require
+                e.CreatedUtc = System.DateTime.UtcNow;
+
+                _ctx.Expenses.Add(e);
                 await _ctx.SaveChangesAsync();
+
+                // mirror your API: create shares for group members
+                var memberIds = await _ctx.GroupMembers
+                    .Where(m => m.GroupId == e.GroupId)
+                    .Select(m => m.UserId)
+                    .ToListAsync();
+
+                if (memberIds.Count > 0)
+                {
+                    var each = System.Math.Round(e.Amount / memberIds.Count, 2);
+                    foreach (var uid in memberIds)
+                    {
+                        _ctx.ExpenseShares.Add(new ExpenseShare
+                        {
+                            ExpenseId = e.Id,
+                            UserId = uid,
+                            ShareAmount = each,
+                            IsSettled = uid == e.PaidByUserId
+                        });
+                    }
+                    await _ctx.SaveChangesAsync();
+                }
+
+                TempData["Toast"] = "Expense added.";
+                return RedirectToAction(nameof(Index));
             }
-            return RedirectToAction(nameof(Index));
+            catch (System.Exception ex)
+            {
+                // ✅ Surface the real DB error (FK/NOT NULL/etc.) on the form
+                ModelState.AddModelError(string.Empty, "Save failed: " + ex.Message);
+                await LoadDropdowns();
+                return View(e);
+            }
         }
 
-        private async Task PopulateLookups()
+        private async Task LoadDropdowns()
         {
-            ViewBag.Groups = new SelectList(await _ctx.Groups.OrderBy(g => g.Name).ToListAsync(), "Id", "Name");
-            ViewBag.Users  = new SelectList(await _ctx.Users.OrderBy(u => u.Name).ToListAsync(), "Id", "Name");
+            ViewBag.GroupId = new SelectList(
+                await _ctx.Groups.AsNoTracking().OrderBy(g => g.Name).ToListAsync(),
+                "Id", "Name");
+
+            ViewBag.PaidByUserId = new SelectList(
+                await _ctx.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync(),
+                "Id", "Name");
         }
     }
 }

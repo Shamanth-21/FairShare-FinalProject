@@ -15,11 +15,11 @@ namespace FairShare.Web.Models
         public DateTime SpentOnUtc { get; set; } = DateTime.UtcNow;
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
-        public int GroupId { get; set; }
-        public Group Group { get; set; } = default!;
+        public int? GroupId { get; set; }
+        public Group? Group { get; set; } = default!;
 
-        public int PaidByUserId { get; set; }
-        public User PaidByUser { get; set; } = default!;
+        public int? PaidByUserId { get; set; }
+        public User? PaidByUser { get; set; } = default!;
 
         public ICollection<ExpenseShare> Shares { get; set; } = new List<ExpenseShare>();
     }
