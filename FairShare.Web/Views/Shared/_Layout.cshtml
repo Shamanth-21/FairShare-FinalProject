@@ -19,6 +19,13 @@
         <li class="nav-item"><a class="nav-link" asp-controller="Users" asp-action="Index">Users</a></li>
         <li class="nav-item"><a class="nav-link" asp-controller="Groups" asp-action="Index">Groups</a></li>
         <li class="nav-item"><a class="nav-link" asp-controller="Expenses" asp-action="Index">Expenses</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Home"
+                        && ViewContext.RouteData.Values["action"]?.ToString()=="About" ? "active" : "")"
+                           asp-controller="Home" asp-action="About">
+                            About Us
+                        </a>
+                    </li>
       </ul>
     </div>
   </div>
