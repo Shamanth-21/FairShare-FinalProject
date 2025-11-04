@@ -2,7 +2,7 @@
     ViewData["Title"] = "About FairShare";
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    // Inline SVG fallback avatar (no network request, so it can't spin forever)
+    // Inline SVG fallback avatar (no network request)
     string FallbackAvatar(string initials) => $@"
 data:image/svg+xml;utf8,
 <svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>
@@ -18,16 +18,8 @@ data:image/svg+xml;utf8,
 </svg>";
 }
 
-<!--
-  FairShare — About Us Page (Razor View)
-  Notes for your teammate (controllers/data):
-  - You can inject a view model later. Search for "TODO(Controller)" comments.
-  - All dynamic KPI placeholders are wrapped with <span data-kpi> tags.
-  - Replace sample content/avatars with real data once available.
--->
-
 <div class="container py-5">
-    <!-- Hero -------------------------------------------------------------- -->
+    <!-- Hero -->
     <section class="row align-items-center g-4 mb-5">
         <div class="col-12 col-lg-7">
             <h1 class="display-5 fw-bold mb-3">Split expenses fairly, stay friends easily.</h1>
@@ -36,10 +28,9 @@ data:image/svg+xml;utf8,
                 and keep every dollar transparent.
             </p>
         </div>
-        
     </section>
 
-    <!-- Mission ----------------------------------------------------------- -->
+    <!-- Mission -->
     <section class="mb-5">
         <div class="row g-4 align-items-center">
             <div class="col-12 col-lg-6">
@@ -80,7 +71,7 @@ data:image/svg+xml;utf8,
         </div>
     </section>
 
-    <!-- How it works ------------------------------------------------------ -->
+    <!-- How it works -->
     <section id="how-it-works" class="mb-5">
         <h2 class="h3 fw-bold mb-4">How it works</h2>
         <div class="row g-4">
@@ -114,7 +105,7 @@ data:image/svg+xml;utf8,
         </div>
     </section>
 
-    <!-- Feature highlights ----------------------------------------------- -->
+    <!-- Feature highlights -->
     <section class="mb-5">
         <h2 class="h3 fw-bold mb-4">Why people choose FairShare</h2>
         <div class="row g-4">
@@ -145,7 +136,7 @@ data:image/svg+xml;utf8,
         </div>
     </section>
 
-    <!-- Team (with photos) ----------------------------------------------- -->
+    <!-- Team -->
     <section class="mb-5">
         <h2 class="h3 fw-bold mb-4">Meet the team</h2>
         <div class="row g-4">
@@ -157,7 +148,9 @@ data:image/svg+xml;utf8,
                          width="120" height="120" loading="lazy"
                          onerror="this.onerror=null; this.src='@FallbackAvatar("MK")';" />
                     <h3 class="h5 mb-1">Manideep Kadarla</h3>
-                    <div class="text-secondary small">Team Member</div>
+                    <div class="text-secondary small">
+                        Backend APIs &amp; EF Core; DB schema/migrations; share-calculation logic.
+                    </div>
                 </div>
             </div>
 
@@ -169,7 +162,9 @@ data:image/svg+xml;utf8,
                          width="120" height="120" loading="lazy"
                          onerror="this.onerror=null; this.src='@FallbackAvatar("SK")';" />
                     <h3 class="h5 mb-1">Shamanth Kodipura Mahesh</h3>
-                    <div class="text-secondary small">Team Member</div>
+                    <div class="text-secondary small">
+                        UI/UX with Bootstrap; Razor views; Chart.js analytics and data visualizations.
+                    </div>
                 </div>
             </div>
 
@@ -181,15 +176,16 @@ data:image/svg+xml;utf8,
                          width="120" height="120" loading="lazy"
                          onerror="this.onerror=null; this.src='@FallbackAvatar("UT")';" />
                     <h3 class="h5 mb-1">Ujwala Tripurana</h3>
-                    <div class="text-secondary small">Team Member</div>
+                    <div class="text-secondary small">
+                        Project setup &amp; integration; testing/QA; documentation and deployment support.
+                    </div>
                 </div>
             </div>
         </div>
     </section>
-
 </div>
 
-<!-- Page-scoped styles (safe to move to site.css later) -->
+<!-- Page-scoped styles -->
 <style>
     .bullet {
         width: 28px;
