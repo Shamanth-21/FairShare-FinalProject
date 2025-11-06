@@ -1,26 +1,34 @@
 using FairShare.Web.Data;
+using FairShare.Web.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// MVC + Razor
+// MVC
 builder.Services.AddControllersWithViews();
-builder.Services.AddControllers(); // for Web API
 
-// EF Core SQL Server
+// EF Core
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-var app = builder.Build();
+// External API (fetch-only currency rates)
+builder.Services.AddHttpClient<ICurrencyRateService, CurrencyRateService>(client =>
+{
+    var baseUrl = builder.Configuration["ExternalApi:BaseUrl"] ?? "https://api.exchangerate.host/";
+    client.BaseAddress = new Uri(baseUrl);
+    var timeout = int.TryParse(builder.Configuration["ExternalApi:TimeoutSeconds"], out var t) ? t : 15;
+    client.Timeout = TimeSpan.FromSeconds(timeout);
+});
 
-// Apply migrations + seed
+var app = builder.Build();
+// DEV ONLY: apply migrations + seed
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await DbInitializer.InitializeAsync(db);
+    await DbSeeder.SeedAsync(db);
 }
 
-// Pipeline
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -29,13 +37,11 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseRouting();
 
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
-
-// Web API endpoints (attribute routing)
-app.MapControllers();
 
 app.Run();

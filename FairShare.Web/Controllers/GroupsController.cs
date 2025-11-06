@@ -1,73 +1,135 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using FairShare.Web.Data;
 using FairShare.Web.Models;
+using FairShare.Web.Services;
 
 namespace FairShare.Web.Controllers
 {
     public class GroupsController : Controller
     {
-        private readonly ApplicationDbContext _ctx;
-        public GroupsController(ApplicationDbContext ctx) { _ctx = ctx; }
+        private readonly ApplicationDbContext _context;
+        private readonly ICurrencyRateService _rateService;
 
-        public async Task<IActionResult> Index() =>
-            View(await _ctx.Groups.Include(g => g.Members).ToListAsync());
-
-        public IActionResult Create() => View();
-
-        [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Group group)
+        public GroupsController(ApplicationDbContext context, ICurrencyRateService rateService)
         {
-            if (!ModelState.IsValid) return View(group);
-            group.CreatedUtc = DateTime.UtcNow;
-            _ctx.Groups.Add(group);
-            await _ctx.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            _context = context;
+            _rateService = rateService;
         }
 
-        public async Task<IActionResult> Edit(int id)
+        // GET: /Groups
+        public async Task<IActionResult> Index()
         {
-            var group = await _ctx.Groups.FindAsync(id);
-            if (group == null) return NotFound();
+            var groups = await _context.Groups
+                .AsNoTracking()
+                .OrderBy(g => g.Name)
+                .ToListAsync();
+
+            return View(groups);
+        }
+
+        // GET: /Groups/Details/5[?to=EUR]
+        public async Task<IActionResult> Details(int id, string? to)
+        {
+            var group = await _context.Groups
+                .Include(g => g.Expenses)
+                    .ThenInclude(e => e.PaidByUser)
+                .Include(g => g.Expenses)
+                    .ThenInclude(e => e.ExpenseShares)
+                .FirstOrDefaultAsync(g => g.Id == id);
+
+            if (group is null) return NotFound();
+
+            // Base total in USD (stored currency)
+            var total = group.Expenses?.Sum(e => e.Amount) ?? 0m;
+            ViewBag.TotalUSD = $"USD {total:0.00}";
+
+            // Optional currency conversion via fetch-only API
+            if (!string.IsNullOrWhiteSpace(to) &&
+                !string.Equals(to, "USD", StringComparison.OrdinalIgnoreCase))
+            {
+                var rate = await _rateService.GetRateAsync("USD", to);
+                ViewBag.ConvertedTo = to.ToUpperInvariant();
+                ViewBag.ConvertedTotal = rate.HasValue
+                    ? $"{to.ToUpperInvariant()} {(total * rate.Value):0.00}"
+                    : "Conversion unavailable right now.";
+            }
+
             return View(group);
         }
 
-        [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Group group)
+        // GET: /Groups/Create
+        public IActionResult Create()
+        {
+            return View(new Group { CreatedUtc = DateTime.UtcNow });
+        }
+
+        // POST: /Groups/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create([Bind("Name,Description")] Group group)
+        {
+            if (!ModelState.IsValid) return View(group);
+
+            group.CreatedUtc = DateTime.UtcNow;
+            _context.Add(group);
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Details), new { id = group.Id });
+        }
+
+        // GET: /Groups/Edit/5
+        public async Task<IActionResult> Edit(int id)
+        {
+            var group = await _context.Groups.FindAsync(id);
+            if (group is null) return NotFound();
+            return View(group);
+        }
+
+        // POST: /Groups/Edit/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Description,CreatedUtc")] Group group)
         {
             if (id != group.Id) return BadRequest();
             if (!ModelState.IsValid) return View(group);
-            _ctx.Update(group);
-            await _ctx.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+
+            try
+            {
+                _context.Update(group);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Details), new { id = group.Id });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await _context.Groups.AnyAsync(g => g.Id == id))
+                    return NotFound();
+                throw;
+            }
         }
 
-        public async Task<IActionResult> Details(int id)
-        {
-            var group = await _ctx.Groups
-                .Include(g => g.Members).ThenInclude(m => m.User)
-                .Include(g => g.Expenses).ThenInclude(e => e.PaidByUser)
-                .FirstOrDefaultAsync(g => g.Id == id);
-            if (group == null) return NotFound();
-            return View(group);
-        }
-
+        // GET: /Groups/Delete/5
         public async Task<IActionResult> Delete(int id)
         {
-            var group = await _ctx.Groups.FindAsync(id);
-            if (group == null) return NotFound();
+            var group = await _context.Groups.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == id);
+            if (group is null) return NotFound();
+
             return View(group);
         }
 
-        [HttpPost, ActionName("Delete"), ValidateAntiForgeryToken]
+        // POST: /Groups/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var group = await _ctx.Groups.FindAsync(id);
-            if (group != null)
-            {
-                _ctx.Groups.Remove(group);
-                await _ctx.SaveChangesAsync();
-            }
+            var group = await _context.Groups.FindAsync(id);
+            if (group is null) return NotFound();
+
+            _context.Groups.Remove(group);
+            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
     }
