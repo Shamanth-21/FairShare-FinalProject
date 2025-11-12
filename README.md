@@ -1,6 +1,6 @@
 # 🧾 FairShare – Group Expense Management Web App
 
-**Live Demo:** [https://fairshare-webapp-frdbevfcpeeave8.switzerlandnorth-01.azurewebsites.net](https://fairshare-webapp-frdbevfcpeeave8.switzerlandnorth-01.azurewebsites.net)
+**Live Demo:** [https://fairshare-webapp-frdbevfycpeeave8.switzerlandnorth-01.azurewebsites.net/](https://fairshare-webapp-frdbevfycpeeave8.switzerlandnorth-01.azurewebsites.net/)
 
 FairShare is a full-stack **ASP.NET Core MVC web application** designed to simplify group expense tracking.  
 It allows users to create groups, add members, record shared expenses, and view automated cost-splitting summaries.  
